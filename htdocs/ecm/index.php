@@ -263,11 +263,13 @@ if ($action == 'refreshmanual')
 				$id = $ecmdirtmp->create($user);
 				if ($id > 0)
 				{
-					$newdirsql = array('id'=>$id,
-									 'id_mere'=>$ecmdirtmp->fk_parent,
-									 'label'=>$ecmdirtmp->label,
-									 'description'=>$ecmdirtmp->description,
-									 'fullrelativename'=>$relativepathmissing);
+					$newdirsql = array(
+						'id'=>$id,
+						'id_mere'=>$ecmdirtmp->fk_parent,
+						'label'=>$ecmdirtmp->label,
+						'description'=>$ecmdirtmp->description,
+						'fullrelativename'=>$relativepathmissing
+					);
 					$sqltree[] = $newdirsql; // We complete fulltree for following loops
 					//var_dump($sqltree);
 					$adirwascreated = 1;
