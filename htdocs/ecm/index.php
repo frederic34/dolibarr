@@ -250,8 +250,7 @@ if ($action == 'refreshmanual')
 				$fk_parent = 0; // Parent is root
 			}
 
-			if ($fk_parent >= 0)
-			{
+			if ($fk_parent >= 0) {
 				$ecmdirtmp->ref                = 'NOTUSEDYET';
 				$ecmdirtmp->label              = dol_basename($dirdesc['fullname']);
 				$ecmdirtmp->description        = '';
@@ -261,8 +260,7 @@ if ($action == 'refreshmanual')
 				dol_syslog($txt);
 				//print $ecmdirtmp->cachenbofdoc."<br>\n";exit;
 				$id = $ecmdirtmp->create($user);
-				if ($id > 0)
-				{
+				if ($id > 0) {
 					$newdirsql = array(
 						'id'=>$id,
 						'id_mere'=>$ecmdirtmp->fk_parent,
