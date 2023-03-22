@@ -773,7 +773,14 @@ if ($id > 0 || !empty($ref)) {
 						$toBeShippedTotal += $toBeShipped[$objp->fk_product];
 						print $toBeShipped[$objp->fk_product];
 					} else {
-						print '0 ('.$langs->trans("Service").')';
+						if (!empty($conf->global->SHIPMENT_SUPPORTS_SERVICES)) {
+							$toBeShipped[$objp->fk_product] = $objp->qty - $qtyAlreadyShipped;
+							$toBeShippedTotal += $toBeShipped[$objp->fk_product];
+							print $toBeShipped[$objp->fk_product];
+							print ' ('.$langs->trans("Service").')';
+						} else {
+							print '0 ('.$langs->trans("Service").')';
+						}
 					}
 					print ($objp->unit_order ? ' '.$objp->unit_order : '').'</td>';
 
