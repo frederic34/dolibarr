@@ -327,10 +327,11 @@ if (empty($reshook)) {
 					$stockLocation = "ent1".$i."_".$j;
 					$qty = "qtyl".$i.'_'.$j;
 				}
-			} elseif (!empty($conf->global->SHIPMENT_SUPPORTS_SERVICES)) {
+			} elseif ($objectsrc->lines[$i]->product_type == Product::TYPE_SERVICE && !empty($conf->global->SHIPMENT_SUPPORTS_SERVICES)) {
 				// shipment line is service
 				$qty .= '_'.$j;
 				$stockLine[$i][0]['qty'] = price2num(GETPOST($qty, 'alpha'), 'MS');
+				$stockLine[$i][$j]['warehouse_id'] = -1;
 				$stockLine[$i][0]['ix_l'] = GETPOST($idl, 'int');
 				$totalqty += price2num(GETPOST($qty, 'alpha'), 'MS');
 
@@ -342,7 +343,6 @@ if (empty($reshook)) {
 					$totalqty += price2num(GETPOST($qty, 'alpha'), 'MS');
 				}
 			}
-			var_dump($qty);
 			// Extrafields
 			$array_options[$i] = $extrafields->getOptionalsFromPost($object->table_element_line, $i);
 			// Unset extrafield
@@ -354,8 +354,8 @@ if (empty($reshook)) {
 			}
 		}
 
-		//var_dump($batch_line[2]);
 		if ($totalqty > 0 && !$error) {		// There is at least one thing to ship and no error
+			var_dump($stockLine);
 			for ($i = 0; $i < $num; $i++) {
 				$qty = "qtyl".$i;
 				if (!isset($batch_line[$i])) {
@@ -377,6 +377,7 @@ if (empty($reshook)) {
 							$ent = "entl".$i;
 							$idl = "idl".$i;
 							$entrepot_id = is_numeric(GETPOST($ent, 'int')) ?GETPOST($ent, 'int') : GETPOST('entrepot_id', 'int');
+							var_dump($entrepot_id);
 							if ($entrepot_id < 0) {
 								$entrepot_id = '';
 							}
