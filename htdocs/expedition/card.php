@@ -386,7 +386,6 @@ if (empty($reshook)) {
 							$ent = "entl".$i;
 							$idl = "idl".$i;
 							$entrepot_id = is_numeric(GETPOST($ent, 'int')) ?GETPOST($ent, 'int') : GETPOST('entrepot_id', 'int');
-							var_dump($entrepot_id);
 							if ($entrepot_id < 0) {
 								$entrepot_id = '';
 							}
@@ -436,11 +435,8 @@ if (empty($reshook)) {
 
 		if (!$error) {
 			$db->commit();
-			$action = '';
-			$object->fetch($object->id);
-			$object->fetch_thirdparty();
-			//header("Location: card.php?id=".$object->id);
-			//exit;
+			header("Location: card.php?id=".$object->id);
+			exit;
 		} else {
 			$db->rollback();
 			$_GET["commande_id"] = GETPOST('commande_id', 'int');
