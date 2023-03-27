@@ -6993,7 +6993,12 @@ class Form
 			if (empty($labeladddateof)) {
 				$labeladddateof = $langs->trans("DateInvoice");
 			}
-			$retstring .= ' - <button class="dpInvisibleButtons datenowlink" id="dateofinvoice" type="button" name="_dateofinvoice" value="now" onclick="console.log(\'Click on now link\'); jQuery(\'#re\').val(\'' . dol_print_date($adddateof, 'dayinputnoreduce') . '\');jQuery(\'#reday\').val(\'' . $tmparray['mday'] . '\');jQuery(\'#remonth\').val(\'' . $tmparray['mon'] . '\');jQuery(\'#reyear\').val(\'' . $tmparray['year'] . '\');">' . $labeladddateof . '</a>';
+			$reset_scripts = 'console.log(\'Click on now link\'); ';
+			$reset_scripts .= 'jQuery(\'#'.$prefix.'\').val(\''.dol_print_date($adddateof, 'dayinputnoreduce').'\');';
+			$reset_scripts .= 'jQuery(\'#'.$prefix.'day\').val(\''.$tmparray['mday'].'\');';
+			$reset_scripts .= 'jQuery(\'#'.$prefix.'month\').val(\''.$tmparray['mon'].'\');';
+			$reset_scripts .= 'jQuery(\'#'.$prefix.'year\').val(\''.$tmparray['year'].'\');';
+			$retstring .= ' - <button class="dpInvisibleButtons datenowlink" id="dateofinvoice" type="button" name="_dateofinvoice" value="now" onclick="'.$reset_scripts.'">'.$labeladddateof.'</a>';
 		}
 
 		return $retstring;
@@ -9832,8 +9837,8 @@ class Form
 	{
 		$out = '<div class="nowraponall">';
 		if ($pos == 'left') {
-			$out .= '<button type="submit" class="liste_titre button_removefilter reposition" name="button_removefilter_x" value="x"><span class="fa fa-remove"></span></button>';
 			$out .= '<button type="submit" class="liste_titre button_search reposition" name="button_search_x" value="x"><span class="fa fa-search"></span></button>';
+			$out .= '<button type="submit" class="liste_titre button_removefilter reposition" name="button_removefilter_x" value="x"><span class="fa fa-remove"></span></button>';
 		} else {
 			$out .= '<button type="submit" class="liste_titre button_search reposition" name="button_search_x" value="x"><span class="fa fa-search"></span></button>';
 			$out .= '<button type="submit" class="liste_titre button_removefilter reposition" name="button_removefilter_x" value="x"><span class="fa fa-remove"></span></button>';

@@ -393,6 +393,15 @@ function restrictedArea(User $user, $features, $object = 0, $tableandshare = '',
 	if ($features == 'product') {
 		$features = 'produit';
 	}
+	if ($features == 'fournisseur') {	// When vendor invoice and pruchase order are into module 'fournisseur'
+		$features = 'fournisseur';
+		$feature2 = '';
+		if ($object->element == 'invoice_supplier') {
+			$feature2 = 'facture';
+		} elseif ($object->element == 'order_supplier') {
+			$feature2 = 'commande';
+		}
+	}
 
 	// Get more permissions checks from hooks
 	$parameters = array('features'=>$features, 'originalfeatures'=>$originalfeatures, 'objectid'=>$objectid, 'dbt_select'=>$dbt_select, 'idtype'=>$dbt_select, 'isdraft'=>$isdraft);
@@ -1114,6 +1123,7 @@ function httponly_accessforbidden($message = 1, $http_response_code = 403, $stri
 function accessforbidden($message = '', $printheader = 1, $printfooter = 1, $showonlymessage = 0, $params = null)
 {
 	global $conf, $db, $user, $langs, $hookmanager;
+	global $action, $object;
 
 	if (!is_object($langs)) {
 		include_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
@@ -1139,12 +1149,13 @@ function accessforbidden($message = '', $printheader = 1, $printfooter = 1, $sho
 	print '</div>';
 	print '<br>';
 	if (empty($showonlymessage)) {
-		global $action, $object;
 		if (empty($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
 			$hookmanager = new HookManager($db);
 			// Initialize technical object to manage hooks of page. Note that conf->hooks_modules contains array of hook context
 			$hookmanager->initHooks(array('main'));
 		}
+
 		$parameters = array('message'=>$message, 'params'=>$params);
 		$reshook = $hookmanager->executeHooks('getAccessForbiddenMessage', $parameters, $object, $action); // Note that $action and $object may have been modified by some hooks
 		print $hookmanager->resPrint;
