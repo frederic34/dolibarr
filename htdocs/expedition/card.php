@@ -355,7 +355,6 @@ if (empty($reshook)) {
 		}
 
 		if ($totalqty > 0 && !$error) {		// There is at least one thing to ship and no error
-			var_dump($stockLine);
 			for ($i = 0; $i < $num; $i++) {
 				$qty = "qtyl".$i;
 				if (!isset($batch_line[$i])) {
@@ -364,12 +363,22 @@ if (empty($reshook)) {
 						//shipment from multiple stock locations
 						$nbstockline = count($stockLine[$i]);
 						for ($j = 0; $j < $nbstockline; $j++) {
-							if ($stockLine[$i][$j]['qty'] > 0) {
+							if ($stockLine[$i][$j]['qty'] > 0 && $stockLine[$i][$j]['warehouse_id'] > 0) {
 								$ret = $object->addline($stockLine[$i][$j]['warehouse_id'], $stockLine[$i][$j]['ix_l'], $stockLine[$i][$j]['qty'], $array_options[$i]);
 								if ($ret < 0) {
 									setEventMessages($object->error, $object->errors, 'errors');
 									$error++;
 								}
+							}
+							if ($stockLine[$i][$j]['qty'] > 0 && $stockLine[$i][$j]['warehouse_id'] < 0) {
+								$saveparam1 = $conf->global->STOCK_WAREHOUSE_NOT_REQUIRED_FOR_SHIPMENTS;
+								$conf->global->STOCK_WAREHOUSE_NOT_REQUIRED_FOR_SHIPMENTS = 1;
+								$ret = $object->addline($stockLine[$i][$j]['warehouse_id'], $stockLine[$i][$j]['ix_l'], $stockLine[$i][$j]['qty'], $array_options[$i]);
+								if ($ret < 0) {
+									setEventMessages($object->error, $object->errors, 'errors');
+									$error++;
+								}
+								$conf->global->STOCK_WAREHOUSE_NOT_REQUIRED_FOR_SHIPMENTS = $saveparam1;
 							}
 						}
 					} else {
