@@ -26,4 +26,4 @@ jobs:
         with:
           files: "**.php" # you may customize glob as needed
           phpcs_path: php phpcs.phar
-          standard: dev/setupe/codesniffer/phpcs.xml
+          standard: dev/setup/codesniffer/phpcs.xml
