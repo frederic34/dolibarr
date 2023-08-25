@@ -49,7 +49,7 @@ class Cpaiement
 	public $code;
 
 	/**
- 	 * @var int ID
+	 * @var int ID
 	 */
 	public $id;
 
