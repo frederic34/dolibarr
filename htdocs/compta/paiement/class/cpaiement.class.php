@@ -54,7 +54,7 @@ class Cpaiement
 	public $id;
 
 	/**
- 	 * @var string[] array of errors messages
+	 * @var string[] array of errors messages
 	 */
 	public $errors;
 
