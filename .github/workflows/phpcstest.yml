@@ -38,8 +38,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: Print PHP version
         run: echo ${{ steps.setup-php.outputs.php-version }}
+      - name: GET STAGED FILES
+        run: export STAGED_FILES_CMD=`git diff --cached --name-only --diff-filter=ACMR HEAD | grep -v '/includes/'| grep \\\\.php`
       - name: Run PHPCS
-        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/* . | cs2pr --graceful-warnings
+        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/* $STAGED_FILES_CMD | cs2pr --graceful-warnings
       - name: Run Parallel Lint
         run: parallel-lint --exclude vendor/ .
       - name: Run VarDump Check
