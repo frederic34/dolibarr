@@ -25,7 +25,7 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
         with:
-         fetch-depth: '0'
+         fetch-depth: 0
       - name: Setup PHP
         id: setup-php
         uses: shivammathur/setup-php@v2
@@ -39,7 +39,7 @@ jobs:
       - name: Print PHP version
         run: echo ${{ steps.setup-php.outputs.php-version }}
       - name: GET STAGED FILES
-        run: export STAGED_FILES_CMD=`git diff --cached --name-only --diff-filter=ACMR HEAD | grep -v '/includes/'| grep \\\\.php`
+        run: export STAGED_FILES_CMD=$(git diff --cached --name-only --diff-filter=ACMR HEAD | grep -v '/includes/'| grep \\\\.php)
       - name: PRINT STAGED FILES
         run: echo STAGED_FILES_CMD=$STAGED_FILES_CMD
       - name: Run PHPCS
