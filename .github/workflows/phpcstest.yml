@@ -1,4 +1,4 @@
-name: "CI"
+name: "PHPCS"
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: 0 # important!
+          fetch-depth: 50 # important!
 
       # we may use whatever way to install phpcs, just specify the path on the next step
       # however, curl seems to be the fastest
