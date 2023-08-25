@@ -1,50 +1,29 @@
-# This is a basic workflow to help you get started with Actions
+name: "CI"
 
-name: PHPCS
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
-  push:
-    branches: [ develop ]
   pull_request:
-    branches: [ develop ]
+    paths:
+      - "**.php"
+      - "phpcs.xml"
+      - ".github/workflows/phpcs.yml"
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  phpcs:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
         with:
-         fetch-depth: 50
-      - name: Setup PHP
-        id: setup-php
-        uses: shivammathur/setup-php@v2
+          fetch-depth: 0 # important!
+
+      # we may use whatever way to install phpcs, just specify the path on the next step
+      # however, curl seems to be the fastest
+      - name: Install PHP_CodeSniffer
+        run: |
+          curl -OL https://squizlabs.github.io/PHP_CodeSniffer/phpcs.phar
+          php phpcs.phar --version
+
+      - uses: thenabeel/action-phpcs@v8
         with:
-          php-version: '7.4'
-          tools: php-parallel-lint/php-var-dump-check, parallel-lint, cs2pr, phpcs
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-          registry-url: 'https://registry.npmjs.org'
-      - name: Print PHP version
-        run: echo ${{ steps.setup-php.outputs.php-version }}
-      - name: GET STAGED FILES
-        run: export STAGED_FILES_CMD=$(git diff --cached --name-only --diff-filter=ACMR HEAD | grep -v '/includes/'| grep \\\\.php)
-      - name: PRINT STAGED FILES
-        run: echo STAGED_FILES_CMD=$STAGED_FILES_CMD
-      - name: Run PHPCS
-        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/* $STAGED_FILES_CMD | cs2pr --graceful-warnings
-      - name: Run Parallel Lint
-        run: parallel-lint --exclude vendor/ .
-      - name: Run VarDump Check
-        run: var-dump-check --extensions php --tracy --exclude vendor/ .
+          files: "**.php" # you may customize glob as needed
+          phpcs_path: php phpcs.phar
+          standard: phpcs.xml
