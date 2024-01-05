@@ -86,7 +86,7 @@ class ActionsMyModule extends CommonHookActions
 	public function getNomUrl($parameters, &$object, &$action)
 	{
 		global $db, $langs, $conf, $user;
-		$this->resprints = '';
+		// $this->resprints = '';
 		return 0;
 	}
 
