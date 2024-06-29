@@ -113,9 +113,9 @@ class Propal extends CommonObject
 	 * Ref from thirdparty
 	 * @var string
 	 * @deprecated
-	 * @see $ref_customer
+	 * @see $ref_customer, property is managed by doldeprecationHandler
 	 */
-	public $ref_client;
+	private $ref_client;
 
 	/**
 	 * Ref from thirdparty
@@ -401,6 +401,18 @@ class Propal extends CommonObject
 	 */
 	const STATUS_BILLED = 4; // Todo rename into STATUS_CLOSE ?
 
+
+	/**
+	 * Provide list of deprecated properties and replacements
+	 *
+	 * @return array<string,string>  Old property to new property mapping
+	 */
+	protected function deprecatedProperties()
+	{
+		return array(
+			'ref_client' => 'ref_customer',
+		) + parent::deprecatedProperties();
+	}
 
 	/**
 	 *	Constructor
@@ -1179,7 +1191,7 @@ class Propal extends CommonObject
 		$sql .= ", ".(!empty($this->deposit_percent) ? "'".$this->db->escape($this->deposit_percent)."'" : 'NULL');
 		$sql .= ", ".($this->mode_reglement_id > 0 ? ((int) $this->mode_reglement_id) : 'NULL');
 		$sql .= ", ".($this->fk_account > 0 ? ((int) $this->fk_account) : 'NULL');
-		$sql .= ", '".$this->db->escape($this->ref_client)."'";
+		$sql .= ", '".$this->db->escape($this->ref_customer)."'";
 		$sql .= ", '".$this->db->escape($this->ref_ext)."'";
 		$sql .= ", ".(!isDolTms($delivery_date) ? "NULL" : "'".$this->db->idate($delivery_date)."'");
 		$sql .= ", ".($this->shipping_method_id > 0 ? $this->shipping_method_id : 'NULL');
@@ -1426,8 +1438,7 @@ class Propal extends CommonObject
 				$object->fk_project = 0; // A cloned proposal is set by default to no project.
 			}
 
-			// reset ref_client
-			$object->ref_client = '';
+			// reset ref_customer
 			$object->ref_customer = '';
 
 			// TODO Change product price if multi-prices
@@ -1503,7 +1514,6 @@ class Propal extends CommonObject
 		$object->datep = $now; // deprecated
 		$object->fin_validite = $object->date + ($object->duree_validite * 24 * 3600);
 		if (!getDolGlobalString('MAIN_KEEP_REF_CUSTOMER_ON_CLONING')) {
-			$object->ref_client = '';
 			$object->ref_customer = '';
 		}
 		if (getDolGlobalInt('MAIN_DONT_KEEP_NOTE_ON_CLONING') == 1) {
@@ -1630,7 +1640,6 @@ class Propal extends CommonObject
 				$this->entity               = $obj->entity;
 
 				$this->ref                  = $obj->ref;
-				$this->ref_client           = $obj->ref_client;
 				$this->ref_customer         = $obj->ref_client;
 				$this->ref_ext              = $obj->ref_ext;
 
@@ -1747,8 +1756,8 @@ class Propal extends CommonObject
 		if (isset($this->ref)) {
 			$this->ref = trim($this->ref);
 		}
-		if (isset($this->ref_client)) {
-			$this->ref_client = trim($this->ref_client);
+		if (isset($this->ref_customer)) {
+			$this->ref_customer = trim($this->ref_customer);
 		}
 		if (isset($this->note) || isset($this->note_private)) {
 			$this->note_private = (isset($this->note_private) ? trim($this->note_private) : trim($this->note));
@@ -1772,7 +1781,7 @@ class Propal extends CommonObject
 		// Update request
 		$sql = "UPDATE ".MAIN_DB_PREFIX."propal SET";
 		$sql .= " ref=".(isset($this->ref) ? "'".$this->db->escape($this->ref)."'" : "null").",";
-		$sql .= " ref_client=".(isset($this->ref_client) ? "'".$this->db->escape($this->ref_client)."'" : "null").",";
+		$sql .= " ref_client=".(isset($this->ref_customer) ? "'".$this->db->escape($this->ref_customer)."'" : "null").",";
 		$sql .= " ref_ext=".(isset($this->ref_ext) ? "'".$this->db->escape($this->ref_ext)."'" : "null").",";
 		$sql .= " fk_soc=".(isset($this->socid) ? $this->socid : "null").",";
 		$sql .= " datep=".(strval($this->date) != '' ? "'".$this->db->idate($this->date)."'" : 'null').",";
@@ -2425,11 +2434,11 @@ class Propal extends CommonObject
 	 * Set customer reference number
 	 *
 	 *  @param      User	$user			Object user that modify
-	 *  @param      string	$ref_client		Customer reference
+	 *  @param      string	$ref_customer	Customer reference
 	 *  @param  	int		$notrigger		1=Does not execute triggers, 0= execute triggers
 	 *  @return     int						Return integer <0 if ko, >0 if ok
 	 */
-	public function set_ref_client($user, $ref_client, $notrigger = 0)
+	public function set_ref_client($user, $ref_customer, $notrigger = 0)
 	{
 		// phpcs:enable
 		if ($user->hasRight('propal', 'creer')) {
@@ -2437,10 +2446,10 @@ class Propal extends CommonObject
 
 			$this->db->begin();
 
-			$sql = "UPDATE ".MAIN_DB_PREFIX."propal SET ref_client = ".(empty($ref_client) ? 'NULL' : "'".$this->db->escape($ref_client)."'");
+			$sql = "UPDATE ".MAIN_DB_PREFIX."propal SET ref_client = ".(empty($ref_customer) ? 'NULL' : "'".$this->db->escape($ref_customer)."'");
 			$sql .= " WHERE rowid = ".((int) $this->id);
 
-			dol_syslog(__METHOD__.' $this->id='.$this->id.', ref_client='.$ref_client, LOG_DEBUG);
+			dol_syslog(__METHOD__.' $this->id='.$this->id.', ref_client='.$ref_customer, LOG_DEBUG);
 			$resql = $this->db->query($sql);
 			if (!$resql) {
 				$this->errors[] = $this->db->error();
@@ -2449,7 +2458,7 @@ class Propal extends CommonObject
 
 			if (!$error) {
 				$this->oldcopy = clone $this;
-				$this->ref_client = $ref_client;
+				$this->ref_customer = $ref_customer;
 			}
 
 			if (!$notrigger && empty($error)) {
@@ -3499,7 +3508,7 @@ class Propal extends CommonObject
 		// Initialise parameters
 		$this->id = 0;
 		$this->ref = 'SPECIMEN';
-		$this->ref_client = 'NEMICEPS';
+		$this->ref_customer = 'NEMICEPS';
 		$this->specimen = 1;
 		$this->socid = 1;
 		$this->date = time();
