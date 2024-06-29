@@ -73,6 +73,10 @@ class Ticket extends CommonObject
 	 * @var int Thirdparty ID
 	 */
 	public $fk_soc;
+
+	/**
+	 * @var int Thirdparty ID
+	 */
 	public $socid;
 
 	/**
@@ -116,11 +120,11 @@ class Ticket extends CommonObject
 	public $private;
 
 	/**
-	 * @var int  Ticket statut
-	 * @deprecated use status
+	 * @var int  Ticket status
+	 * @deprecated use status, property is managed by doldeprecationHandler
 	 * @see $status
 	 */
-	public $fk_statut;
+	private $fk_statut; // @phpstan-ignore-line
 
 	/**
 	 * @var int  Ticket status
@@ -334,6 +338,18 @@ class Ticket extends CommonObject
 	);
 	// END MODULEBUILDER PROPERTIES
 
+
+	/**
+	 * Provide list of deprecated properties and replacements
+	 *
+	 * @return array<string,string>  Old property to new property mapping
+	 */
+	protected function deprecatedProperties()
+	{
+		return array(
+			'fk_statut' => 'status',
+		) + parent::deprecatedProperties();
+	}
 
 	/**
 	 *  Constructor
