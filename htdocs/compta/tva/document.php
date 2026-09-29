@@ -78,7 +78,7 @@ $modulepart = 'tax-vat';
 if ($user->socid) {
 	$socid = $user->socid;
 }
-$result = restrictedArea($user, 'tax', '', 'tva', 'charges');
+$result = restrictedArea($user, 'tax', $id, 'tva', 'charges');
 
 $permissiontoadd = $user->hasRight('tax', 'charges', 'creer');	// Used by the include of actions_dellink.inc.php
 

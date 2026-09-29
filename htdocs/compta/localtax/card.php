@@ -48,7 +48,7 @@ $socid = GETPOSTINT('socid');
 if ($user->socid) {
 	$socid = $user->socid;
 }
-$result = restrictedArea($user, 'tax', '', '', 'charges');
+$result = restrictedArea($user, 'tax', $id, 'localtax', 'charges');
 
 $object = new Localtax($db);
 
