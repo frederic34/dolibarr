@@ -818,6 +818,57 @@ jQuery(document).on('dolagenda:relayout', function () {
 JSDAYVIEW;
 		$s .= "\n";
 	}
+	if (getDolGlobalString('AGENDA_AUTOREFRESH_ENABLED') && ($mode == 'show_day' || $mode == 'show_week' || $mode == 'show_month' || empty($mode))) {
+		// Code to periodically fetch and insert/refresh events created or updated since the last check,
+		// without a page reload. One remove-then-append per reported event handles creation, an in-place
+		// update, and a slot/day change alike - see ajax/ajaxrefreshevents.php for the server-side half.
+		$s .= 'var dolAgendaAutorefreshFilters = '.json_encode(array(
+			'filtert' => (string) $filtert,
+			'usergroup' => (string) $usergroup,
+			'resourceid' => (int) $resourceid,
+			'actioncode' => $actioncode,
+			'pid' => (int) $pid,
+			'socid' => (int) $socid,
+			'type' => (string) $type,
+			'status' => (string) $status,
+			'search_categ_cus' => (int) $search_categ_cus,
+		)).';'."\n";
+		$s .= 'var dolAgendaAutorefreshLastCheck = '.((int) dol_now()).';'."\n";
+		$s .= 'setInterval(function() {'."\n";
+		$s .= 'jQuery.ajax({type: "POST", url: "'.DOL_URL_ROOT.'/comm/action/ajax/ajaxrefreshevents.php", dataType: "json", data: {'."\n";
+		$s .= 'mode: '.json_encode($mode).', year: '.((int) $year).', month: '.((int) $month).', day: '.((int) $day).','."\n";
+		$s .= 'firstdaytoshow: '.((int) $firstdaytoshow).', lastdaytoshow: '.((int) $lastdaytoshow).','."\n";
+		$s .= 'since: dolAgendaAutorefreshLastCheck,'."\n";
+		$s .= 'filters: JSON.stringify(dolAgendaAutorefreshFilters),'."\n";
+		$s .= 'token: jQuery("#searchFormList input[name=token]").val()'."\n";
+		$s .= '}})'."\n";
+		$s .= '.done(function (data) {'."\n";
+		$s .= 'if (!data.error) {'."\n";
+		$s .= 'var missingtarget = false;'."\n";
+		$s .= 'jQuery.each(data.newevents, function(i, ev) {'."\n";
+		$s .= 'var $t = jQuery(ev.targetselector);'."\n";
+		$s .= 'if (!$t.length) { missingtarget = true; return; }'."\n";
+		// Day view layer: an event outside the displayed hours needs a reload so that the range widens
+		$s .= 'if ($t.hasClass("agendadaylayer")) {'."\n";
+		$s .= 'var ms = /data-agenda-start="(\d+)"/.exec(ev.html), me = /data-agenda-end="(\d+)"/.exec(ev.html);'."\n";
+		$s .= 'if (ms && me && (parseInt(ms[1], 10) < parseInt($t.attr("data-begin-min"), 10) || Math.max(parseInt(me[1], 10), parseInt(ms[1], 10) + 20) > parseInt($t.attr("data-end-min"), 10))) { missingtarget = true; }'."\n";
+		$s .= '}'."\n";
+		$s .= '});'."\n";
+		$s .= 'if (missingtarget) { location.reload(); return; }'."\n";
+		$s .= 'dolAgendaAutorefreshLastCheck = data.checktime;'."\n";
+		$s .= 'var dolAgendaAutorefreshSeenIds = {};'."\n";
+		$s .= 'jQuery.each(data.newevents, function(i, ev) {'."\n";
+		$s .= 'if (!dolAgendaAutorefreshSeenIds[ev.eventid]) { jQuery(\'[data-agenda-event-id="\'+ev.eventid+\'"]\').remove(); dolAgendaAutorefreshSeenIds[ev.eventid] = true; }'."\n";
+		$s .= 'var $target = jQuery(ev.targetselector);'."\n";
+		$s .= '$target.append(ev.html);'."\n";
+		// Inserted boxes need their tooltips initialized, as page-load ones are
+		$s .= 'if (typeof Dolibarr !== "undefined" && Dolibarr.initNewContent) { Dolibarr.initNewContent($target.find(\'[data-agenda-event-id="\'+ev.eventid+\'"]\'), false); }'."\n";
+		$s .= '});'."\n";
+		$s .= 'if (typeof dolAgendaDayLayout === "function") { jQuery(".agendadaylayer").each(function () { dolAgendaDayLayout(this); }); }'."\n";
+		$s .= '}'."\n";
+		$s .= '});'."\n";
+		$s .= '}, '.((int) getDolGlobalInt('AGENDA_AUTOREFRESH_FREQUENCY', 60)).' * 1000);'."\n";
+	}
 	$s .= '});'."\n";
 	$s .= '</script>'."\n";
 
@@ -1749,7 +1800,8 @@ if (empty($mode) || $mode == 'show_month') {      // View by month
 	// shrinks to content width instead - the hourly grid escapes this only because it has a second,
 	// fixed-width label cell giving the browser something concrete to size the table from.
 	// Always rendered (even with an empty bucket), with a stable "alldayevent_" id distinct from
-	// show_day_events()'s own "dayevent_YYYYMMDD" title-bar wrapper id.
+	// show_day_events()'s own "dayevent_YYYYMMDD" title-bar wrapper id, so the autorefresh polling
+	// endpoint always has a valid, unambiguous insertion point for a newly-polled all-day event.
 	$dateint = sprintf("%04d", $year).sprintf("%02d", $month).sprintf("%02d", $day);
 	print '<div class="tagtable centpercent">';
 	print '<div class="tagtr">';

@@ -685,7 +685,7 @@ function show_day_events($db, $day, $month, $year, $monthshown, $style, &$eventa
 	//var_dump($colorindexused);
 
 	include_once DOL_DOCUMENT_ROOT.'/holiday/class/holiday.class.php';
-	// Loaded here too because the Ajax callers (ajax/ajaxmoveevent.php, ajax/ajaxmovetimeevent.php) run with NOREQUIRESOC
+	// Loaded here too because callers like ajax/ajaxrefreshevents.php run with NOREQUIRESOC
 	include_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 	include_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 	$tmpholiday = new Holiday($db);
@@ -871,9 +871,10 @@ function show_day_events($db, $day, $month, $year, $monthshown, $style, &$eventa
 					} else {
 						print '<div id="event_'.$ymd.'_'.$i.'" class="event family_'.$event->type.' '.$cssclass.($morecss ? ' '.$morecss : '').'"';
 					}
-					// Only real actioncomm-backed events get a stable id - birthdate/holiday/icalevent
+					// Only real actioncomm-backed events get a stable polling id - birthdate/holiday/icalevent
 					// entries reuse $event->id from unrelated id spaces (contact id, holiday id, 0 for ical),
-					// which would otherwise collide with a real event's id in the drag&drop JS.
+					// which would otherwise collide with a real event's id and cause the autorefresh JS to
+					// remove the wrong DOM element.
 					print $daypositionattr;
 					print(in_array($event->type, array('birthdate', 'holiday', 'icalevent'), true) ? '>' : ' data-agenda-event-id="'.((int) $event->id).'">');
 
@@ -1202,7 +1203,7 @@ function dol_color_minus($color, $minus, $minusunit = 16)
 /**
  * Build $eventarray (list of ActionComm objects, indexed by day) for the agenda calendar views
  * (month/week/day), applying the exact same date-range and filter logic the calendar page itself uses.
- * Extracted from htdocs/comm/action/index.php so it can be reused outside the page.
+ * Extracted from htdocs/comm/action/index.php so it can be reused by ajax/ajaxrefreshevents.php.
  *
  * @param	DoliDB			$db					Database handler
  * @param	HookManager		$hookmanager		Hook manager
@@ -1216,9 +1217,10 @@ function dol_color_minus($color, $minus, $minusunit = 16)
  * @param	int				$firstdaytoshow		Start of the visible date range (Unix timestamp)
  * @param	int				$lastdaytoshow		End of the visible date range (Unix timestamp, exclusive)
  * @param	array{usergroup:string,filtert:string,resourceid:int,actioncode:string|string[],pid:int,socid:int,type:string,status:string,search_categ_cus:int}	$filters	Already-resolved filter values
+ * @param	int|null		$sincedatec			If set, only return events created (datec) or modified (tms) after this Unix timestamp; null = no restriction (identical to today's behavior)
  * @return	array{eventarray:array<int,array<int,ActionComm>>,nbevents:int,maxonsamepage:int}
  */
-function agenda_build_eventarray($db, $hookmanager, $user, &$object, &$action, $mode, $year, $month, $day, $firstdaytoshow, $lastdaytoshow, $filters)
+function agenda_build_eventarray($db, $hookmanager, $user, &$object, &$action, $mode, $year, $month, $day, $firstdaytoshow, $lastdaytoshow, $filters, $sincedatec = null)
 {
 	$usergroup = $filters['usergroup'];
 	$filtert = $filters['filtert'];
@@ -1373,6 +1375,9 @@ function agenda_build_eventarray($db, $hookmanager, $user, &$object, &$action, $
 		$sql .= " (a.datep < '".$db->idate(dol_mktime(0, 0, 0, $month, 1, $year) - (60 * 60 * 24 * 7))."'";
 		$sql .= " AND a.datep2 > '".$db->idate(dol_mktime(23, 59, 59, $month, 28, $year) + (60 * 60 * 24 * 10))."')";
 		$sql .= ')';
+	}
+	if ($sincedatec !== null) {
+		$sql .= " AND (a.datec > '".$db->idate($sincedatec)."' OR a.tms > '".$db->idate($sincedatec)."')";
 	}
 	if ($type) {
 		$sql .= " AND ca.id = ".((int) $type);
