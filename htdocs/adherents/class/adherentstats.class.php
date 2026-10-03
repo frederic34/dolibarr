@@ -346,10 +346,20 @@ class AdherentStats extends Stats
 		$lastModifiedMembers = [];
 
 		$sql = "SELECT a.rowid, a.ref, a.lastname, a.firstname, a.societe as company, a.fk_soc,";
-		$sql .= " a.datec, GREATEST(a.tms, aef.tms) as datem, a.statut as status, a.datefin as date_end_subscription,";
+		// COALESCE: GREATEST() returns NULL on MySQL when the member has no extrafields row
+		$sql .= " a.datec, GREATEST(a.tms, COALESCE(aef.tms, a.tms)) as datem, a.statut as status, a.datefin as date_end_subscription,";
 		$sql .= ' a.photo, a.email, a.gender, a.morphy,';
 		$sql .= " t.rowid as typeid, t.subscription, t.libelle as label";
 		$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
+		if ($max > 0) {
+			// A sort on GREATEST() can not use an index and would sort all the members on each call: the $max most recently
+			// modified members and the $max members with the most recently modified extrafields are selected first (sorts on a
+			// single column, each can use an index on tms), and the final sort on GREATEST() runs on these candidates only.
+			$sqlfilter = " INNER JOIN ".MAIN_DB_PREFIX."adherent_type as t ON t.rowid = a.fk_adherent_type WHERE a.entity IN (".getEntity('member').")";
+			$sqlcandidates = "(SELECT a.rowid FROM ".MAIN_DB_PREFIX."adherent as a".$sqlfilter." ORDER BY a.tms DESC".$this->db->plimit($max, 0).")";
+			$sqlcandidates .= " UNION (SELECT a.rowid FROM ".MAIN_DB_PREFIX."adherent as a INNER JOIN ".MAIN_DB_PREFIX."adherent_extrafields as aef ON aef.fk_object = a.rowid".$sqlfilter." ORDER BY aef.tms DESC".$this->db->plimit($max, 0).")";
+			$sql .= " INNER JOIN (".$sqlcandidates.") as cand ON cand.rowid = a.rowid";
+		}
 		$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'adherent_extrafields as aef ON aef.fk_object = a.rowid';
 		$sql .= ", ".MAIN_DB_PREFIX."adherent_type as t";
 		$sql .= " WHERE a.entity IN (".getEntity('member').")";
