@@ -326,6 +326,7 @@ StockEntryDate=Date of <br>entry in stock
 StockMovementWillBeRecorded=Stock movement will be recorded
 StockMovementNotYetRecorded=Stock movement will not be affected by this step
 ReverseConfirmed=Stock movement has been reversed successfully
+ErrorStockMovementOfAManufacturingOrder=Stock movement %s was recorded by a manufacturing order. It must be reversed from the manufacturing order (delete of the consumed line, or cancel of the order with its consumed and produced lines).
 WarningThisWIllAlsoDeleteStock=Warning, this will also destroy all quantities in stock in the warehouse
 ValidateInventory=Inventory validation
 IncludeSubWarehouse=Include sub-warehouse ?

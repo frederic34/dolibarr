@@ -639,6 +639,14 @@ if (!$error && $action == 'confirm_reverse' && $confirm == "yes" && $permissiont
 			$object->id = 0;
 			$object->fetch($obj->rowid);		// $object is MouvementStock
 
+			// A movement of a manufacturing order is reversed from the MO (delete of the consumed line or cancel of the MO),
+			// else the MO keeps its consumed or produced line and would reverse the movement a second time.
+			if ($object->origin_type == 'mo') {
+				setEventMessages($langs->trans("ErrorStockMovementOfAManufacturingOrder", $object->id), null, 'errors');
+				$error++;
+				break;
+			}
+
 			// TODO Add a protection to disallow reversion if type of movement is not the same value for all selected lines
 
 			// Create the reverse movement
