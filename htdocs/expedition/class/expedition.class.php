@@ -1064,7 +1064,8 @@ class Expedition extends CommonObject
 		}
 
 		// Change status of order to "shipment in process"
-		if (!$error) {
+		// A shipment with no origin (standalone shipment) has no order to change: setStatut() would change the status of the shipment itself
+		if (!$error && !empty($this->origin) && $this->origin_id > 0) {
 			$triggerKey = 'SHIPPING_'; // Because when the trigger is fired the object is a shipping and not the real target object, so I add a prefix like SHIPPING_ to avoid confusion
 			if ($this->origin == 'commande') {
 				$triggerKey.= 'ORDER_SHIPMENTONPROCESS';
