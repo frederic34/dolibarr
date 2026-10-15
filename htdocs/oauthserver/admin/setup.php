@@ -112,6 +112,10 @@ $urls = [
 	'OAuthWellKnownUrl' => oauthserverGetWellKnownUrl(),
 	'OAuthApiResourceUrl' => oauthserverGetResourceUrl('api'),
 ];
+if (isModEnabled('ai')) {
+	$urls['OAuthMcpResourceUrl'] = oauthserverGetResourceUrl('mcp');
+	$urls['OAuthMcpResourceMetadataUrl'] = DOL_MAIN_URL_ROOT.'/ai/server/oauth_protected_resource.php';
+}
 foreach ($urls as $key => $url) {
 	print '<tr class="oddeven"><td>'.$langs->trans($key).'</td><td>'.showValueWithClipboardCPButton($url, 0).'</td></tr>';
 }

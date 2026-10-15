@@ -101,6 +101,17 @@ class MCPServer
 	}
 
 	/**
+	 * Refuse the tools that write: the request came with a read-only OAuth access token.
+	 *
+	 * @param bool $readonly True to refuse writes
+	 * @return void
+	 */
+	public function setReadOnly($readonly)
+	{
+		$this->mcpHandler->setReadOnly($readonly);
+	}
+
+	/**
 	 * Validate the spec 2026-07-28 transport headers against the request body.
 	 *
 	 * Enforcement is presence-based for backward compatibility: a 2025-11-25

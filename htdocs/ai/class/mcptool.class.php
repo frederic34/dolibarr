@@ -146,6 +146,12 @@ abstract class McpTool
 	 * the caller comes back with it. The text is what a human is asked to approve,
 	 * so it names the records and amounts involved rather than dumping arguments.
 	 *
+	 * This method is also the read-only gate: a request made with an OAuth access
+	 * token without the write scope refuses every tool returning a preview. A tool
+	 * added by another module (hook addMcpTools) that does not override this method
+	 * is refused too in that case, because it never said whether it writes: such a
+	 * tool overrides it and returns NO_WRITE when it only reads.
+	 *
 	 * @param string $toolName Tool that would run.
 	 * @param array<string,mixed> $args Arguments it would run with.
 	 * @return string Preview text, or self::NO_WRITE when nothing is written.

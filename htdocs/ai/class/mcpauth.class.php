@@ -55,6 +55,11 @@ class McpAuth
 	const MODE_SHARED = 'shared';
 
 	/**
+	 * Credential mode: an OAuth access token of the OAuth Server module was presented.
+	 */
+	const MODE_OAUTH = 'oauth';
+
+	/**
 	 * @var DoliDB Database handler
 	 */
 	private $db;
@@ -87,6 +92,21 @@ class McpAuth
 	 *                AI_MCP_USER_ID.
 	 */
 	public $user = null;
+
+	/**
+	 * @var string[] Scopes of the OAuth access token, in MODE_OAUTH
+	 */
+	public $scopes = [];
+
+	/**
+	 * @var string OAuth error code (invalid_token, insufficient_scope) when an OAuth token was refused
+	 */
+	public $oauthErrorCode = '';
+
+	/**
+	 * @var string Where the credential was read: header, bearer, xapikey or query
+	 */
+	private $credentialsource = '';
 
 	/**
 	 * Constructor
@@ -128,9 +148,11 @@ class McpAuth
 		}
 
 		$credential = '';
+		$this->credentialsource = '';
 
 		if (!empty($server['HTTP_DOLAPIKEY'])) {
 			$credential = $server['HTTP_DOLAPIKEY'];
+			$this->credentialsource = 'header';
 		}
 
 		if ($credential === '') {
@@ -146,11 +168,13 @@ class McpAuth
 			$reg = array();
 			if ($authheader !== '' && preg_match('/^Bearer\s+(\S+)$/i', $authheader, $reg)) {
 				$credential = $reg[1];
+				$this->credentialsource = 'bearer';
 			}
 		}
 
 		if ($credential === '' && !empty($server['HTTP_X_API_KEY'])) {
 			$credential = $server['HTTP_X_API_KEY'];
+			$this->credentialsource = 'xapikey';
 		}
 
 		// Query-string fallback, required by MCP clients that cannot send a
@@ -163,6 +187,7 @@ class McpAuth
 			foreach (array('DOLAPIKEY', 'api_key', 'key') as $param) {
 				if (!empty($get[$param])) {
 					$credential = $get[$param];
+					$this->credentialsource = 'query';
 					break;
 				}
 			}
@@ -189,6 +214,8 @@ class McpAuth
 		$this->userid = 0;
 		$this->mode = '';
 		$this->user = null;
+		$this->scopes = [];
+		$this->oauthErrorCode = '';
 
 		$credential = $this->getCredential($server, $get);
 
@@ -204,6 +231,11 @@ class McpAuth
 			$this->httpcode = 503;
 			$this->error = 'Bad value for the API key. An API key should not start with dolcrypt:';
 			return -1;
+		}
+
+		// OAuth access token of the OAuth Server module
+		if (strpos($credential, 'dolat_') === 0) {
+			return $this->authenticateOAuth($credential);
 		}
 
 		// Shared server key, kept for setups configured before per-user keys
@@ -252,22 +284,97 @@ class McpAuth
 	}
 
 	/**
+	 * Authenticate with an OAuth access token.
+	 *
+	 * @param 	string 	$credential 	Access token
+	 * @return 	int 					1 if authenticated, -1 otherwise
+	 */
+	private function authenticateOAuth($credential)
+	{
+		global $conf;
+
+		if (!isModEnabled('oauthserver')) {
+			$this->error = 'Unauthorized';
+			return -1;
+		}
+		if ($this->credentialsource !== 'bearer') {
+			$this->error = 'OAuth access tokens must be sent in the Authorization: Bearer header';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/oauthserver/class/oauthservertoken.class.php';
+
+		$grant = new OAuthServerToken($this->db);
+		if ($grant->validateAccessToken($credential, 'mcp') <= 0) {
+			$this->oauthErrorCode = $grant->error_code;
+			$this->httpcode = ($grant->error_code === 'insufficient_scope' ? 403 : 401);
+			$this->error = $grant->error_description;
+			return -1;
+		}
+		// MCP requests run in the entity of the endpoint
+		if ($grant->entity !== (int) $conf->entity) {
+			$this->oauthErrorCode = 'invalid_token';
+			$this->error = 'This access token belongs to another entity';
+			return -1;
+		}
+
+		$tmpuser = new User($this->db);
+		if ($tmpuser->fetch($grant->fk_user) <= 0 || !$grant->isUserAllowed($tmpuser)) {
+			$this->oauthErrorCode = 'invalid_token';
+			$this->error = 'The user of this access token is not allowed any more';
+			return -1;
+		}
+		$tmpuser->loadRights();
+		if (!$tmpuser->hasRight('ai', 'assistant', 'use')) {
+			$this->httpcode = 403;
+			$this->error = 'The user owning this access token is not allowed to use the AI assistant';
+			return -1;
+		}
+
+		// Shown in the "Connected applications" tab
+		$this->db->query("UPDATE ".$this->db->prefix()."oauth_token SET lastaccess = '".$this->db->idate(dol_now('gmt'), 'gmt')."' WHERE rowid = ".((int) $grant->id));
+
+		$this->userid = (int) $tmpuser->id;
+		$this->user = $tmpuser;
+		$this->mode = self::MODE_OAUTH;
+		$this->scopes = $grant->scopes;
+		dol_syslog('[MCP Server] Request authenticated with an OAuth access token for user '.$tmpuser->login, LOG_DEBUG);
+
+		return 1;
+	}
+
+	/**
+	 * Whether the request may only read: an OAuth access token without the write scope.
+	 *
+	 * @return bool True if writes must be refused
+	 */
+	public function isReadOnly()
+	{
+		return ($this->mode === self::MODE_OAUTH && !in_array('write', $this->scopes, true));
+	}
+
+	/**
 	 * Value of the WWW-Authenticate header to send with a 401.
 	 *
 	 * RFC 6750 section 3 requires the challenge on a rejected Bearer request;
 	 * without it a client cannot tell "this endpoint wants a token" from "this
-	 * endpoint is broken". When an authorization server is added, the URL of
+	 * endpoint is broken". When the OAuth Server module is enabled, the URL of
 	 * the Protected Resource Metadata document is passed here and clients
 	 * discover it as described by RFC 9728 section 5.1.
 	 *
 	 * @param 	string 	$resourcemetadataurl 	Absolute URL of the Protected Resource Metadata document, if any
+	 * @param 	string 	$error 					OAuth error code (RFC 6750 section 3.1), if any
 	 * @return 	string 							Header value, without the header name
 	 */
-	public function getWwwAuthenticateHeader($resourcemetadataurl = '')
+	public function getWwwAuthenticateHeader($resourcemetadataurl = '', $error = '')
 	{
 		$challenge = 'Bearer realm="Dolibarr MCP"';
 		if ($resourcemetadataurl !== '') {
 			$challenge .= ', resource_metadata="'.$resourcemetadataurl.'"';
+		}
+		if ($error !== '') {
+			$challenge .= ', error="'.$error.'"';
 		}
 
 		return $challenge;

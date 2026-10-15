@@ -81,9 +81,11 @@ $headers = array_change_key_case($headers, CASE_LOWER);
 $mcpAuth = new McpAuth($db);
 
 if ($mcpAuth->authenticate() < 0) {
-	if ($mcpAuth->httpcode == 401) {
+	if ($mcpAuth->httpcode == 401 || $mcpAuth->oauthErrorCode !== '') {
 		// RFC 6750 section 3: a rejected Bearer request must say what it wanted.
-		header('WWW-Authenticate: ' . $mcpAuth->getWwwAuthenticateHeader());
+		// RFC 9728 section 5.1: the resource metadata tells the client where to obtain a token.
+		$resourcemetadataurl = (isModEnabled('oauthserver') ? DOL_MAIN_URL_ROOT.'/ai/server/oauth_protected_resource.php' : '');
+		header('WWW-Authenticate: ' . $mcpAuth->getWwwAuthenticateHeader($resourcemetadataurl, $mcpAuth->oauthErrorCode));
 	}
 
 	http_response_code($mcpAuth->httpcode);
@@ -213,6 +215,7 @@ try {
 	}
 
 	$server = new MCPServer($db, $conf, $serviceUser);
+	$server->setReadOnly($mcpAuth->isReadOnly());
 
 	// Batch request handling
 	if (is_array($request) && array_keys($request) === range(0, count($request) - 1)) {

@@ -70,6 +70,16 @@ class McpHandler
 	private $toolcontext;
 
 	/**
+	 * @var bool True when the tools that write are refused (read-only OAuth access token)
+	 */
+	private $readonly = false;
+
+	/**
+	 * @var array<string,bool> Names of the tools registered by other modules through the hook addMcpTools
+	 */
+	private $externaltoolnames = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @param DoliDB    $db      Database handler object
@@ -273,7 +283,7 @@ class McpHandler
 					// instead of array(array($tool)) still works - the
 					// HookManager flattens results into resArray, so bare
 					// instances are the natural mistake to make.
-					$this->registerTool(get_class($moduleTools), $moduleTools);
+					$this->registerTool(get_class($moduleTools), $moduleTools, true);
 					continue;
 				}
 				if (!is_array($moduleTools)) {
@@ -281,7 +291,7 @@ class McpHandler
 				}
 				foreach ($moduleTools as $toolInstance) {
 					if ($toolInstance instanceof McpTool) {
-						$this->registerTool(get_class($toolInstance), $toolInstance);
+						$this->registerTool(get_class($toolInstance), $toolInstance, true);
 					} else {
 						dol_syslog('[McpHandler] A module provided a tool that is not an instance of McpTool.', LOG_WARNING);
 					}
@@ -297,10 +307,11 @@ class McpHandler
 	 *
 	 * @param string   $key          A unique key for the tool (e.g., filename or class name).
 	 * @param McpTool  $toolInstance The instantiated tool object.
+	 * @param bool     $external     True for a tool provided by another module (hook addMcpTools).
 	 *
 	 * @return void
 	 */
-	private function registerTool(string $key, McpTool $toolInstance)
+	private function registerTool(string $key, McpTool $toolInstance, bool $external = false)
 	{
 		$this->loadedTools[$key] = $toolInstance;
 
@@ -314,6 +325,9 @@ class McpHandler
 					);
 				} else {
 					$this->toolsByName[$def['name']] = $toolInstance;
+					if ($external) {
+						$this->externaltoolnames[$def['name']] = true;
+					}
 				}
 			}
 		}
@@ -513,6 +527,18 @@ class McpHandler
 
 		return '';
 	}
+
+	/**
+	 * Refuse the tools that write. Set for a request made with a read-only OAuth access token.
+	 *
+	 * @param bool $readonly True to refuse writes
+	 * @return void
+	 */
+	public function setReadOnly($readonly)
+	{
+		$this->readonly = (bool) $readonly;
+	}
+
 	/**
 	 * Stop a write until it is confirmed, on the MCP multi-round-trip pattern.
 	 *
@@ -527,12 +553,25 @@ class McpHandler
 	 */
 	private function checkWriteConfirmation($tool, $toolName, array $args)
 	{
+		// Read-only fails closed for the tools of other modules that never said whether they write:
+		// the default writeConfirmationPreview() of McpTool answers NO_WRITE for them.
+		if ($this->readonly && isset($this->externaltoolnames[$toolName])) {
+			$method = new ReflectionMethod($tool, 'writeConfirmationPreview');
+			if ($method->getDeclaringClass()->getName() === 'McpTool') {
+				return array('error' => "Tool '".$toolName."' does not declare whether it writes data, and this OAuth access token is read-only (scope write missing).");
+			}
+		}
+
 		if (!method_exists($tool, 'writeConfirmationPreview')) {
 			return null;
 		}
 		$preview = (string) $tool->writeConfirmationPreview($toolName, $args);
 		if ($preview === McpTool::NO_WRITE) {
 			return null;	// read tool
+		}
+
+		if ($this->readonly) {
+			return array('error' => "Tool '".$toolName."' writes data, and this OAuth access token is read-only (scope write missing).");
 		}
 
 		// A write bound to fail is refused before the user is asked to approve it.

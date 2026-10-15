@@ -179,6 +179,8 @@ class AllTests
 		$suite->addTestSuite('AiMcpApiBridgeTest');
 		//require_once dirname(__FILE__).'/AiMcpWireTest.php';
 		//$suite->addTestSuite('AiMcpWireTest');
+		require_once dirname(__FILE__).'/AiMcpOAuthTest.php';
+		$suite->addTestSuite('AiMcpOAuthTest');
 		//require_once dirname(__FILE__).'/AiWriteConfirmationTest.php';
 		//$suite->addTestSuite('AiWriteConfirmationTest');
 		require_once dirname(__FILE__).'/CompanyLibTest.php';
