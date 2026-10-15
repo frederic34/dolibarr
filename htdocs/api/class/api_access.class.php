@@ -41,6 +41,7 @@ use Luracast\Restler\iAuthenticate;
 use Luracast\Restler\Resources;
 use Luracast\Restler\Defaults;
 use Luracast\Restler\RestException;
+use Luracast\Restler\Util;
 
 /**
  * Dolibarr API access class
@@ -69,6 +70,10 @@ class DolibarrApiAccess implements iAuthenticate
 	 */
 	public static $user = null;
 
+	/**
+	 * @var string[]	Scopes of the OAuth access token of the request. Empty for an API key, which has no scope restriction.
+	 */
+	public static $tokenscopes = [];
 
 	/**
 	 * Constructor
@@ -103,6 +108,9 @@ class DolibarrApiAccess implements iAuthenticate
 			dol_syslog($key.' - '.$val);
 		}*/
 
+		static::$tokenscopes = [];
+		$apikeyfrombearer = false;
+
 		// api key can be provided in url with parameter api_key=xxx or ni header with header DOLAPIKEY:xxx
 		$api_key = '';
 		if (isset($_GET['api_key']) || isset($_GET['DOLAPIKEY'])) {
@@ -129,9 +137,32 @@ class DolibarrApiAccess implements iAuthenticate
 		} elseif (empty($api_key)) {
 			$headers = getallheaders();					// HTTP Header entry "Authorization: Bearer ..." can be read with getallheaders
 			$api_key = preg_replace('/^Bearer\s+/i', '', empty($headers['Authorization']) ? '' : $headers['Authorization']);
+			$apikeyfrombearer = true;
 		};
 
 		$api_key = dol_string_nounprintableascii($api_key, 1);
+
+		// OAuth access tokens of the OAuth Server module start with dolat_. OAuth 2.1 accepts them only in
+		// the Authorization: Bearer header: never in the URL (logs, Referer) nor in DOLAPIKEY.
+		$isoauthtoken = (strpos($api_key, 'dolat_') === 0);
+		$oauthgrantid = 0;
+		$oauthscopes = [];
+		if ($isoauthtoken) {
+			if (!$apikeyfrombearer) {
+				throw new RestException(401, 'OAuth access tokens must be sent in the Authorization: Bearer header');
+			}
+			if (!isModEnabled('oauthserver')) {
+				throw new RestException(401, 'OAuth access tokens are not accepted: the module OAuth Server is disabled');
+			}
+			require_once DOL_DOCUMENT_ROOT.'/oauthserver/class/oauthservertoken.class.php';
+			$oauthgrant = new OAuthServerToken($this->db);
+			if ($oauthgrant->validateAccessToken($api_key, 'api') <= 0) {
+				header('WWW-Authenticate: Bearer realm="Dolibarr API", error="'.$oauthgrant->error_code.'"');
+				throw new RestException(($oauthgrant->error_code === 'insufficient_scope' ? 403 : 401), $oauthgrant->error_description);
+			}
+			$oauthgrantid = (int) $oauthgrant->id;
+			$oauthscopes = $oauthgrant->scopes;
+		}
 
 		if (preg_match('/^dolcrypt:/i', $api_key)) {
 			throw new RestException(503, 'Bad value for the API key. An API key should not start with dolcrypt:');
@@ -141,7 +172,26 @@ class DolibarrApiAccess implements iAuthenticate
 			$userentity = 0;
 			$token_rowid = 0;
 
-			if (!getDolGlobalString('API_IN_TOKEN_TABLE')) {
+			if ($isoauthtoken) {
+				// The token was validated above: load the user of the grant the same way as an API token,
+				// so that the entity switch and all the user checks below apply unchanged.
+				if (isModEnabled('multicompany') && getDolGlobalString('MULTICOMPANY_TRANSVERSE_MODE') && defined("DOLENTITY")) {
+					$sql = "SELECT DISTINCT u.login, u.datec, u.api_key as use_api, oat.tokenstring as api_key, oat.entity as token_entity, oat.rowid as token_rowid,";
+					$sql .= " oat.tms as date_modification,";
+					$sql .= " gu.entity";
+					$sql .= " FROM ".$this->db->prefix()."oauth_token AS oat";
+					$sql .= " JOIN ".$this->db->prefix()."user AS u ON u.rowid = oat.fk_user";
+					$sql .= " JOIN ".$this->db->prefix()."usergroup_user as gu ON u.rowid = gu.fk_user AND gu.entity = ".((int) $conf->entity);
+					$sql .= " WHERE oat.rowid = ".((int) $oauthgrantid);
+					$sql .= " AND gu.entity = oat.entity";
+				} else {
+					$sql = "SELECT u.login, u.datec, u.api_key as use_api, u.entity, oat.tokenstring as api_key, oat.entity as token_entity, oat.rowid as token_rowid,";
+					$sql .= " oat.tms as date_modification";
+					$sql .= " FROM ".$this->db->prefix()."oauth_token AS oat";
+					$sql .= " JOIN ".$this->db->prefix()."user AS u ON u.rowid = oat.fk_user";
+					$sql .= " WHERE oat.rowid = ".((int) $oauthgrantid);
+				}
+			} elseif (!getDolGlobalString('API_IN_TOKEN_TABLE')) {
 				if (isModEnabled('multicompany') && getDolGlobalString('MULTICOMPANY_TRANSVERSE_MODE') && defined("DOLENTITY")) {
 					$sql = "SELECT DISTINCT u.login, u.datec, u.api_key as use_api, u.api_key as api_key, 0 as token_rowid,";
 					$sql .= " u.tms as date_modification,";
@@ -258,7 +308,7 @@ class DolibarrApiAccess implements iAuthenticate
 				throw new RestException(503, 'Error when fetching user api_key :'.$this->db->lasterror());
 			}
 
-			if ($login && $stored_key != $api_key) {		// This should not happen since we did a search on api_key
+			if ($login && !$isoauthtoken && $stored_key != $api_key) {		// This should not happen since we did a search on api_key
 				$userClass::setCacheIdentifier($api_key);
 				return false;
 			}
@@ -303,9 +353,19 @@ class DolibarrApiAccess implements iAuthenticate
 				throw new RestException(401, $genericmessageerroruser);
 			}
 
+			if ($isoauthtoken) {
+				static::$tokenscopes = $oauthscopes;
+				// Without the write scope, an OAuth access token can only read
+				$requestmethod = strtoupper((string) Util::getRequestMethod());
+				if (!in_array('write', $oauthscopes, true) && !in_array($requestmethod, ['GET', 'HEAD', 'OPTIONS'], true)) {
+					header('WWW-Authenticate: Bearer realm="Dolibarr API", error="insufficient_scope", scope="api write"');
+					throw new RestException(403, 'This OAuth access token is read-only (scope write missing)');
+				}
+			}
+
 			// Increase counter of API access
 			if (getDolGlobalString('API_COUNTER_ENABLED')) {
-				if (!getDolGlobalString('API_IN_TOKEN_TABLE')) {
+				if (!getDolGlobalString('API_IN_TOKEN_TABLE') && !$isoauthtoken) {
 					// Update the counter into table llx_const
 					include DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 					dolibarr_set_const($this->db, 'API_COUNTER_COUNT', getDolGlobalInt('API_COUNTER_COUNT') + 1);
@@ -324,6 +384,9 @@ class DolibarrApiAccess implements iAuthenticate
 
 					$this->db->query($sqlforcounter);
 				}
+			} elseif ($isoauthtoken) {
+				// Shown in the "Connected applications" tab
+				$this->db->query("UPDATE ".$this->db->prefix()."oauth_token SET lastaccess = '".$this->db->idate(dol_now('gmt'), 'gmt')."' WHERE rowid = ".((int) $token_rowid));
 			}
 
 			// User seems valid
