@@ -122,6 +122,12 @@ class Events // extends CommonObject
 		array('id' => 'USERGROUP_CREATE', 'test' => 1),
 		array('id' => 'USERGROUP_MODIFY', 'test' => 1),
 		array('id' => 'USERGROUP_DELETE', 'test' => 1),
+		array('id' => 'OAUTHSERVER_CLIENT_CREATE', 'test' => 1),
+		array('id' => 'OAUTHSERVER_CLIENT_DELETE', 'test' => 1),
+		array('id' => 'OAUTHSERVER_GRANT_CREATE', 'test' => 1),
+		array('id' => 'OAUTHSERVER_GRANT_REVOKE', 'test' => 1),
+		array('id' => 'OAUTHSERVER_REFRESH_REUSE', 'test' => 1),
+		array('id' => 'OAUTHSERVER_CODE_REPLAY', 'test' => 1),
 	);
 
 

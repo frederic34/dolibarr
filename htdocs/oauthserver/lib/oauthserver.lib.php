@@ -370,3 +370,42 @@ function oauthserverSendError($httpcode, $error, $description = '', $headers = [
 	}
 	oauthserverSendJson($httpcode, $data, $headers);
 }
+
+/**
+ * Tabs of the module setup pages.
+ *
+ * @return	array<array{0:string,1:string,2:string}>	Tabs
+ */
+function oauthserverAdminPrepareHead()
+{
+	global $langs;
+
+	$h = 0;
+	$head = [];
+	$head[$h][0] = DOL_URL_ROOT.'/oauthserver/admin/setup.php';
+	$head[$h][1] = $langs->trans("Settings");
+	$head[$h][2] = 'settings';
+	$h++;
+	$head[$h][0] = DOL_URL_ROOT.'/oauthserver/client_list.php';
+	$head[$h][1] = $langs->trans("OAuthClients");
+	$head[$h][2] = 'clients';
+
+	return $head;
+}
+
+/**
+ * Web server rules serving the RFC 8414 metadata at the well-known URL.
+ *
+ * @param	string	$mainurlroot	Root URL of Dolibarr, DOL_MAIN_URL_ROOT when empty
+ * @return	array{apache:string,nginx:string}	Rules
+ */
+function oauthserverGetRewriteRules($mainurlroot = '')
+{
+	$wellknownpath = (string) parse_url(oauthserverGetWellKnownUrl($mainurlroot), PHP_URL_PATH);
+	$target = (string) parse_url(oauthserverGetIssuer($mainurlroot), PHP_URL_PATH).'/metadata.php';
+
+	return [
+		'apache' => "RewriteEngine On\nRewriteRule ^/?".str_replace('.', '\\.', ltrim($wellknownpath, '/'))."/?$ ".$target." [L]",
+		'nginx' => "location = ".$wellknownpath." {\n    rewrite ^ ".$target." last;\n}",
+	];
+}

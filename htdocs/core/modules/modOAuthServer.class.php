@@ -53,7 +53,7 @@ class modOAuthServer extends DolibarrModules
 
 		$this->module_parts = [];
 		$this->dirs = [];
-		$this->config_page_url = [];
+		$this->config_page_url = ["setup.php@oauthserver"];
 
 		$this->hidden = false;
 		$this->depends = [];
@@ -70,7 +70,9 @@ class modOAuthServer extends DolibarrModules
 			3 => ['OAUTHSERVER_DCR_MAX_PER_HOUR', 'chaine', '20', 'Maximum number of dynamic client registrations per hour', 0, 'current', 0],
 		];
 
-		$this->tabs = [];
+		$this->tabs = [
+			['data' => 'user:+oauthapps:OAuthConnectedApplications:oauthserver:isModEnabled("oauthserver"):/oauthserver/user_grants.php?id=__ID__'],
+		];
 		$this->dictionaries = [];
 		$this->boxes = [];
 

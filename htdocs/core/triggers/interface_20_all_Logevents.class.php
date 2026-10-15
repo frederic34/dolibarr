@@ -45,7 +45,13 @@ class InterfaceLogevents extends DolibarrTriggers
 		'USER_DELETE' => 'UserDeleted',
 		'USERGROUP_CREATE' => 'NewGroupCreated',
 		'USERGROUP_MODIFY' => 'GroupModified',
-		'USERGROUP_DELETE' => 'GroupDeleted'
+		'USERGROUP_DELETE' => 'GroupDeleted',
+		'OAUTHSERVER_CLIENT_CREATE' => 'OAuthClientCreated',
+		'OAUTHSERVER_CLIENT_DELETE' => 'OAuthClientDeleted',
+		'OAUTHSERVER_GRANT_CREATE' => 'OAuthGrantCreated',
+		'OAUTHSERVER_GRANT_REVOKE' => 'OAuthGrantRevoked',
+		'OAUTHSERVER_REFRESH_REUSE' => 'OAuthRefreshTokenReused',
+		'OAUTHSERVER_CODE_REPLAY' => 'OAuthCodeReplayed'
 	);
 	/**
 	 * @var string	Label
