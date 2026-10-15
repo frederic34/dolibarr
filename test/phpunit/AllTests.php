@@ -304,6 +304,8 @@ class AllTests
 
 		require_once dirname(__FILE__).'/OAuthServerTest.php';
 		$suite->addTestSuite('OAuthServerTest');
+		require_once dirname(__FILE__).'/OAuthServerHttpTest.php';
+		$suite->addTestSuite('OAuthServerHttpTest');
 
 		require_once dirname(__FILE__).'/DolresourceTest.php';
 		$suite->addTestSuite('DolresourceTest');

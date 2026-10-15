@@ -743,4 +743,42 @@ class OAuthServerTest extends CommonClassTest
 		$this->assertSame(0, (new OAuthServerToken($db))->fetch($grant->id), 'expired grant without refresh token is purged');
 		$this->assertSame(1, (new OAuthServerToken($db))->fetch($alive->id), 'a grant whose refresh token is valid is kept');
 	}
+
+	/**
+	 * Rewrite rules for an install under a sub-path
+	 *
+	 * @return void
+	 */
+	public function testRewriteRules()
+	{
+		$rules = oauthserverGetRewriteRules('https://host.example/dolibarr');
+		$this->assertSame(
+			"RewriteEngine On\nRewriteRule ^/?\\.well-known/oauth-authorization-server/dolibarr/oauthserver/?$ /dolibarr/oauthserver/metadata.php [L]",
+			$rules['apache']
+		);
+		$this->assertSame(
+			"location = /.well-known/oauth-authorization-server/dolibarr/oauthserver {\n    rewrite ^ /dolibarr/oauthserver/metadata.php last;\n}",
+			$rules['nginx']
+		);
+	}
+
+	/**
+	 * A security event is recorded when its code is enabled
+	 *
+	 * @return void
+	 */
+	public function testSecurityEventRecorded()
+	{
+		global $db, $conf;
+
+		$conf->global->MAIN_LOGEVENTS_OAUTHSERVER_CLIENT_CREATE = '1';
+		$client = $this->createTestClient();
+		unset($conf->global->MAIN_LOGEVENTS_OAUTHSERVER_CLIENT_CREATE);
+
+		$resql = $db->query("SELECT description FROM ".$db->prefix()."events WHERE type = 'OAUTHSERVER_CLIENT_CREATE' ORDER BY rowid DESC".$db->plimit(1));
+		$this->assertNotFalse($resql);
+		$obj = $db->fetch_object($resql);
+		$this->assertNotEmpty($obj, 'no security event recorded');
+		$this->assertStringContainsString('client_id='.$client->client_id, (string) $obj->description);
+	}
 }
