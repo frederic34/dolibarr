@@ -82,6 +82,8 @@ class OAuthServerHttpTest extends CommonClassTest
 		if (strpos(self::urlRoot(), 'http://') === 0) {
 			self::setTestConst('OAUTHSERVER_ALLOW_HTTP');
 		}
+		// Dynamic client registration is off by default
+		self::setTestConst('OAUTHSERVER_ALLOW_DCR');
 
 		parent::setUpBeforeClass();
 	}
@@ -468,5 +470,125 @@ class OAuthServerHttpTest extends CommonClassTest
 
 		$answer = $this->post('token.php', ['grant_type' => 'authorization_code', 'client_id' => 'unknown']);
 		$this->assertSame(401, $answer['code']);
+	}
+
+	/**
+	 * POST JSON to an endpoint
+	 *
+	 * @param	string					$script		Script in htdocs/oauthserver
+	 * @param	array<string,mixed>		$body		JSON body
+	 * @param	string[]				$headers	Extra headers
+	 * @return	array{code:int,json:mixed}		HTTP status and decoded body
+	 */
+	private function postJson($script, $body, $headers = [])
+	{
+		$result = getURLContent($this->requestUrl($script), 'POST', (string) json_encode($body), 0,
+			$this->requestHeaders(array_merge(['Content-Type: application/json', 'Accept: application/json'], $headers)), ['https', 'http'], 2);
+
+		return ['code' => (int) $result['http_code'], 'json' => json_decode((string) $result['content'], true)];
+	}
+
+	/**
+	 * Registration expected to be refused; a client created anyway is deleted at the end
+	 *
+	 * @param	array<string,mixed>		$body		JSON body
+	 * @param	string[]				$headers	Extra headers
+	 * @return	array{code:int,json:mixed}		HTTP status and decoded body
+	 */
+	private function registerRefused($body, $headers = [])
+	{
+		global $db;
+		$answer = $this->postJson('register.php', $body, $headers);
+		if (is_array($answer['json']) && !empty($answer['json']['client_id'])) {
+			$this->commitAndRestart();
+			$client = new OAuthServerClient($db);
+			if ($client->fetch(0, (string) $answer['json']['client_id']) > 0) {
+				self::$clientids[] = $client->id;
+			}
+		}
+
+		return $answer;
+	}
+
+	/**
+	 * Dynamic registration of a public client, then a code exchange with it
+	 *
+	 * @return void
+	 */
+	public function testDynamicRegistration()
+	{
+		global $db;
+		$answer = $this->postJson('register.php', ['client_name' => 'PHPUnit <b>DCR</b>', 'redirect_uris' => [self::REDIRECT],
+			'grant_types' => ['authorization_code', 'refresh_token'], 'response_types' => ['code'], 'token_endpoint_auth_method' => 'none']);
+		$this->assertSame(201, $answer['code'], json_encode($answer['json']));
+		$this->assertSame('none', $answer['json']['token_endpoint_auth_method']);
+		$this->assertSame('PHPUnit DCR', $answer['json']['client_name'], 'HTML is stripped from the name');
+
+		$this->commitAndRestart();
+		$client = new OAuthServerClient($db);
+		$this->assertSame(1, $client->fetch(0, $answer['json']['client_id']));
+		self::$clientids[] = $client->id;
+		$this->assertSame('dynamic', $client->registration_type);
+		$this->assertSame((int) $client->datec, $answer['json']['client_id_issued_at'], 'client_id_issued_at is the creation date');
+
+		$tokens = $this->exchange($client, $this->newCode($client));
+		$this->assertSame(200, $tokens['code']);
+	}
+
+	/**
+	 * Registration refusals
+	 *
+	 * @return void
+	 */
+	public function testDynamicRegistrationRefusals()
+	{
+		$answer = $this->registerRefused(['client_name' => 'x', 'redirect_uris' => ['http://evil.example/cb']]);
+		$this->assertSame('invalid_redirect_uri', $answer['json']['error']);
+
+		$answer = $this->registerRefused(['client_name' => 'x', 'redirect_uris' => ['https://user:pw@app.example/cb']]);
+		$this->assertSame('invalid_redirect_uri', $answer['json']['error'], 'userinfo is refused');
+
+		$answer = $this->registerRefused(['client_name' => 'x', 'redirect_uris' => [self::REDIRECT], 'token_endpoint_auth_method' => 'client_secret_basic']);
+		$this->assertSame('invalid_client_metadata', $answer['json']['error']);
+
+		$answer = $this->registerRefused(['client_name' => 'x', 'redirect_uris' => [self::REDIRECT], 'scope' => 'api write']);
+		$this->assertSame('invalid_client_metadata', $answer['json']['error'], 'scope outside OAUTHSERVER_DCR_SCOPES');
+
+		$answer = $this->registerRefused(['client_name' => 'x', 'redirect_uris' => ['https://сlaude.ai/cb']]);
+		$this->assertSame('invalid_redirect_uri', $answer['json']['error'], 'non-ASCII host is refused');
+
+		// A field present with a wrong type is refused, never replaced by its default
+		$wrongtypes = [
+			['scope' => ['mcp']],
+			['scope' => 1],
+			['client_name' => ['x']],
+			['token_endpoint_auth_method' => ['none']],
+			['grant_types' => 'authorization_code'],
+			['grant_types' => [1]],
+			['response_types' => 'code'],
+			['redirect_uris' => self::REDIRECT],
+			['redirect_uris' => [self::REDIRECT, 1]],
+			['redirect_uris' => ['a' => self::REDIRECT]],
+		];
+		foreach ($wrongtypes as $field) {
+			$answer = $this->registerRefused(array_merge(['client_name' => 'x', 'redirect_uris' => [self::REDIRECT]], $field));
+			$this->assertSame(400, $answer['code'], json_encode($field));
+			$this->assertSame('invalid_client_metadata', $answer['json']['error'], json_encode($field));
+		}
+	}
+
+	/**
+	 * Registration in another entity needs the module multicompany
+	 *
+	 * @return void
+	 */
+	public function testDynamicRegistrationOtherEntity()
+	{
+		if (isModEnabled('multicompany')) {
+			$this->markTestSkipped('Only meaningful without multicompany');
+		}
+		$answer = $this->registerRefused(['client_name' => 'x', 'redirect_uris' => [self::REDIRECT]], ['DOLAPIENTITY: 2']);
+		$this->assertSame(400, $answer['code']);
+		$this->assertSame('invalid_client_metadata', $answer['json']['error']);
 	}
 }

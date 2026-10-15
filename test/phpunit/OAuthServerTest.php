@@ -177,6 +177,15 @@ class OAuthServerTest extends CommonClassTest
 		foreach (['http://example.com/cb', 'https://app.example/cb#frag', 'javascript:alert(1)', 'claude://cb', '', '/relative', 'https:///nohost'] as $uri) {
 			$this->assertFalse(oauthserverIsValidRedirectUri($uri), $uri);
 		}
+		// Userinfo, backslash, whitespace/control characters and empty fragment
+		foreach (['https://user:pw@app.example/cb', 'https://evil.example\\@app.example/cb', 'https://app.example/c b', "https://app.example/cb\n", 'https://app.example/cb#'] as $uri) {
+			$this->assertFalse(oauthserverIsValidRedirectUri($uri), $uri);
+		}
+		// Non-ASCII (IDN, Cyrillic look-alike) hosts and percent-encoded hosts are refused
+		foreach (['https://сlaude.ai/cb', 'https://xn--laude-3ve.ai/cb?q=é', "https://app.example/cb\xc2\xa0", 'https://claude.ai%2Eevil.com/', 'https://claude.ai%2eevil.com/cb'] as $uri) {
+			$this->assertFalse(oauthserverIsValidRedirectUri($uri), $uri);
+		}
+		$this->assertTrue(oauthserverIsValidRedirectUri('https://xn--laude-3ve.ai/cb?q=%C3%A9'), 'punycode host and percent-encoded query are fine');
 	}
 
 	/**

@@ -53,6 +53,27 @@ $item->fieldParams['isMandatory'] = 1;
 $item = $formSetup->newItem('OAUTHSERVER_REFRESH_TOKEN_LIFETIME');
 $item->setAsNumber(3600, 31536000);
 $item->fieldParams['isMandatory'] = 1;
+$item = $formSetup->newItem('OAUTHSERVER_ALLOW_DCR');
+$item->setAsYesNo();
+$item->helpText = $langs->transnoentities('OAUTHSERVER_ALLOW_DCR_Help');
+$item = $formSetup->newItem('OAUTHSERVER_DCR_SCOPES');
+$item->setAsString();
+$item->defaultFieldValue = 'mcp read write offline_access';
+$item->fieldAttr['placeholder'] = 'mcp read write offline_access';
+$dcrscopesitem = $item;
+// Saved only when made of supported scopes containing api or mcp
+$item->setValueFromPostCallBack(function () use ($dcrscopesitem, $langs) {
+	$scopes = oauthserverParseScopes(GETPOST('OAUTHSERVER_DCR_SCOPES', 'alphanohtml'));
+	if (empty($scopes) || array_diff($scopes, oauthserverGetSupportedScopes()) || (!in_array('api', $scopes, true) && !in_array('mcp', $scopes, true))) {
+		setEventMessages($langs->trans("ErrorOAuthDcrScopes"), null, 'errors');
+		return -1;
+	}
+	$dcrscopesitem->fieldValue = implode(' ', $scopes);
+
+	return 1;
+});
+$item = $formSetup->newItem('OAUTHSERVER_DCR_MAX_PER_HOUR');
+$item->setAsNumber(1, 1000);
 
 $setupnotempty = count($formSetup->items);
 $permissiontotestdiscovery = $user->admin;

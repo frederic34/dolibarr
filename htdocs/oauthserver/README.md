@@ -17,6 +17,7 @@ Issuer: `<Dolibarr root URL>/oauthserver`
 | Authorization | `authorize.php` | User consent page, returns an authorization code (PKCE S256 required) |
 | Token | `token.php` | Exchanges a code or a refresh token for tokens |
 | Revocation | `revoke.php` | Revokes an access or refresh token (RFC 7009) |
+| Registration | `register.php` | Dynamic client registration (RFC 7591), only when dynamic client registration is enabled |
 | Metadata | `metadata.php` | Authorization server metadata (RFC 8414) |
 
 ## Scopes

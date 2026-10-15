@@ -206,7 +206,9 @@ function oauthserverResolveScopes($requested, $allowed, $resource, &$error, $mai
 
 /**
  * Check a redirect URI before it is registered: https, or http on a loopback
- * host for native applications (RFC 8252 section 7.3), never a fragment.
+ * host for native applications (RFC 8252 section 7.3). Never a fragment (even
+ * empty), userinfo, backslash, whitespace, control or non-ASCII character
+ * (look-alike hosts must be registered in punycode), nor a '%' in the host.
  *
  * @param	string	$uri	Redirect URI
  * @return	bool			True if acceptable
@@ -216,8 +218,13 @@ function oauthserverIsValidRedirectUri($uri)
 	if (!is_string($uri) || $uri === '' || strlen($uri) > 2000) {
 		return false;
 	}
+	// Only printable ASCII: no whitespace, control or non-ASCII byte anywhere
+	if (strpos($uri, '#') !== false || strpos($uri, '\\') !== false || preg_match('/[^\x21-\x7e]/', $uri)) {
+		return false;
+	}
 	$parts = parse_url($uri);
-	if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host']) || isset($parts['fragment'])) {
+	if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host']) || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])
+		|| strpos($parts['host'], '%') !== false) {
 		return false;
 	}
 	$scheme = strtolower($parts['scheme']);

@@ -75,6 +75,10 @@ $metadata = [
 	'authorization_response_iss_parameter_supported' => true,
 ];
 
+if (getDolGlobalString('OAUTHSERVER_ALLOW_DCR')) {
+	$metadata['registration_endpoint'] = $issuer.'/register.php';
+}
+
 // Public document: browser based clients (MCP Inspector...) may read it.
 oauthserverSendJson(200, $metadata, ['Access-Control-Allow-Origin: *']);
 exit;
