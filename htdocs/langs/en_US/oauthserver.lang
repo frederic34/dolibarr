@@ -1,0 +1,10 @@
+# Dolibarr language file - Source file is en_US - oauthserver
+Module69000Name = OAuth Server
+Module69000Desc = OAuth 2.1 authorization server: applications and MCP clients obtain access tokens for the REST API and the MCP server instead of a static API key
+OAuthServerPurgeExpired = Purge expired OAuth codes and tokens
+OAuthServerPurgeExpiredComment = Deletes expired authorization codes, expired grants and dynamically registered clients never used after 30 days
+ErrorOAuthClientLabelRequired = The name of the application is required
+ErrorOAuthClientRedirectUriRequired = At least one redirect URI is required
+ErrorOAuthClientBadRedirectUri = A redirect URI is not valid: it must be an https:// URL, or an http:// URL on 127.0.0.1, localhost or [::1], without fragment
+ErrorOAuthClientBadAuthMethod = Unknown client authentication method
+ErrorOAuthClientBadScopes = The allowed scopes must be taken from api, mcp, read, write, offline_access and contain api or mcp

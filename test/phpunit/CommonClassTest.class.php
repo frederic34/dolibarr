@@ -428,6 +428,7 @@ abstract class CommonClassTest extends TestCase
 		'notification' => 'Notification',
 		'numberwords' => null, // Not provided by default, no module tests
 		'oauth' => 'Oauth',
+		'oauthserver' => 'OAuthServer',
 		'openstreetmap' => null,  // External module?
 		'opensurvey' => 'OpenSurvey',
 		'order' => 'Commande',
